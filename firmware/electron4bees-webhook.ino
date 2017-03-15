@@ -1,10 +1,8 @@
 // This #include statement was automatically added by the Particle IDE.
 #include "application.h" //Notwendig damit die externe RGB-LED schon beim Booten leuchtet!
 #include "HX711.h"
-#include "Particle.h"  
+#include "Particle.h"
 #include "Adafruit_DHT.h"
-#include "SparkFunMAX17043.h" // Include the SparkFun MAX17043 library
-
 
 //********************************************************************
 // Automatically mirror the onboard RGB LED to an external RGB LED
@@ -83,6 +81,8 @@ String stringSOC = "";
 
 void setup() {
   // put your setup code here, to run once:
+    pinMode(D7, OUTPUT);
+
   // Begin serial communication
     Serial.begin(115200);
 
@@ -122,6 +122,7 @@ void loop() {
 
     scale.power_up();
     delay(5000);
+    digitalWrite(D7, LOW);
     //scale.get_units(10) returns the medium of 10 measures
     floatGewicht = (scale.get_units(10) - offset);
     stringGewicht =  String(floatGewicht, 2);
@@ -148,16 +149,9 @@ void loop() {
     	floatTemperature4 = dht_pin4.getTempCelcius();
       stringTemperature4 = String(floatTemperature4, 2);
 
-    // Set up the MAX17043 LiPo fuel gauge:
-      lipo.begin(); // Initialize the MAX17043 LiPo fuel gauge
-
-    // Quick start restarts the MAX17043 in hopes of getting a more accurate
-    // guess for the SOC.
-      lipo.quickStart();
-      delay(1000);
-
-    // lipo.getSOC() returns the estimated state of charge (e.g. 79%)
-	    soc = lipo.getSOC();
+    // Use the on-board Fuel Gauge
+      FuelGauge fuel;
+      soc = fuel.getSoC();
       stringSOC = String(soc);
       delay(1000);
 
