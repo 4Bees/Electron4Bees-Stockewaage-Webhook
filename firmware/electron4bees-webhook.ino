@@ -81,14 +81,13 @@ String stringSOC = "";
 
 void setup() {
   // put your setup code here, to run once:
-    pinMode(D7, OUTPUT);
 
   // Begin serial communication
-    Serial.begin(115200);
+  Serial.begin(9600);
 
-    // Listen for the webhook response, and call gotWeatherData()
-    Particle.subscribe("hook-response/get_scalefactor", gotScalefactor, MY_DEVICES);
+    // Listen for the webhook response, and call gotScalefactor() and gotOffset()
     Particle.subscribe("hook-response/get_offset", gotOffset, MY_DEVICES);
+    Particle.subscribe("hook-response/get_scalefactor", gotScalefactor, MY_DEVICES);
 
     // Give ourselves 10 seconds before we actually start the
     // program.  This will open the serial monitor before
@@ -99,12 +98,15 @@ void setup() {
     }
 
     // publish the event that will trigger our Webhook
+    Particle.publish("get_offset");
     Particle.publish("get_scalefactor");
     delay(5000);
-    Particle.publish("get_offset");
-    delay(5000);
-    scalefactor = str_scalefactor.toFloat();
+
     offset = str_offset.toFloat();
+    scalefactor = str_scalefactor.toFloat();
+
+    //Serial.println(offset);
+    //Serial.println(scalefactor);
 
     scale.set_scale(scalefactor);                      //this value is obtained by calibrating the scale with known weights;
                                                  /*   How to Calibrate Your Scale
@@ -120,23 +122,27 @@ void setup() {
 
 void loop() {
 
-    scale.power_up();
-    delay(5000);
-    digitalWrite(D7, LOW);
-    //scale.get_units(10) returns the medium of 10 measures
-    floatGewicht = (scale.get_units(10) - offset);
-    stringGewicht =  String(floatGewicht, 2);
+      scale.power_up();
 
-    scale.power_down();
 
     //Begin DHT communication
       dht_pin3.begin();
       dht_pin4.begin();
 
+      delay(5000);
+
+    //scale.get_units(10) returns the medium of 10 measures
+      floatGewicht = (scale.get_units(10) - offset);
+      stringGewicht =  String(floatGewicht, 2);
+
+      Serial.println(floatGewicht);
+      Serial.println(stringGewicht);
+
+      scale.power_down();
+
     // Reading temperature or humidity takes about 250 milliseconds!
     // Sensor readings may also be up to 2 seconds 'old' (its a
     // very slow sensor)
-      delay(5000);
     	floatHumidity3 = dht_pin3.getHumidity();
       stringHumidity3 = String(floatHumidity3, 2),
     // Read temperature as Celsius
@@ -157,20 +163,22 @@ void loop() {
 
       Particle.publish("cloud4bees", JSON(), PRIVATE); // Send JSON Particle Cloud
 
-      //delay(30000);
+      delay(1000);
 
-      System.sleep(SLEEP_MODE_DEEP, 600);
+      System.sleep(SLEEP_MODE_DEEP, 3600);
 
+}
+
+
+
+// This function will get called when offset comes in
+void gotOffset(const char *name, const char *data) {
+    str_offset = String(data);
 }
 
 // This function will get called when scalefactor comes in
 void gotScalefactor(const char *name, const char *data) {
     str_scalefactor = String(data);
-}
-
-// This function will get called when offset comes in
-void gotOffset(const char *name, const char *data) {
-    str_offset = String(data);
 }
 
 
