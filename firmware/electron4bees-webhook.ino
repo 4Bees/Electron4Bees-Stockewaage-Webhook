@@ -3,6 +3,15 @@
 #include "HX711.h"
 #include "Particle.h"
 #include "Adafruit_DHT.h"
+#include "cellular_hal.h"
+
+// Using SEMI_AUTOMATIC mode to get the lowest possible data usage by
+// registering functions and variables BEFORE connecting to the cloud.
+//SYSTEM_MODE(SEMI_AUTOMATIC);
+
+//Hologram APN
+//STARTUP(cellular_credentials_set("hologram", "", "", NULL));
+
 
 //********************************************************************
 // Automatically mirror the onboard RGB LED to an external RGB LED
@@ -36,8 +45,8 @@ ExternalRGB myRGB(D0, D1, D2);
 //********************************************************************
 
 // DHT humidity/temperature sensors
-#define DHTPIN3 3     // what pin we're connected to
-#define DHTPIN4 4
+#define DHTPIN3 D4     // what pin we're connected to
+#define DHTPIN4 D5
 
 // Uncomment whatever type you're using!
 //#define DHTTYPE DHT11		// DHT 11
@@ -58,7 +67,7 @@ String str_scalefactor = "";
 String str_offset = "";
 
 float offset = 0;
-float scalefactor = 1;
+float scalefactor = 0;
 
 float floatGewicht = 0;
 String stringGewicht = "";
@@ -78,9 +87,14 @@ String stringTemperature4 ="";
 double soc = 0; // Variable to keep track of LiPo state-of-charge (SOC)
 String stringSOC = "";
 
+boolean scale_conf = false;
+
 
 void setup() {
   // put your setup code here, to run once:
+
+  //Needed in SEMI_AUTOMATIC Mode
+  //Particle.connect();
 
   // Begin serial communication
   Serial.begin(9600);
@@ -97,6 +111,8 @@ void setup() {
         delay(1000);
     }
 
+
+
     // publish the event that will trigger our Webhook
     Particle.publish("get_offset");
     Particle.publish("get_scalefactor");
@@ -105,8 +121,34 @@ void setup() {
     offset = str_offset.toFloat();
     scalefactor = str_scalefactor.toFloat();
 
-    //Serial.println(offset);
-    //Serial.println(scalefactor);
+    CellularSignal sig = Cellular.RSSI();
+    Serial.print("RSSI: ");
+    Serial.println(sig.rssi);
+    Serial.print("Quality: ");
+    Serial.println(sig.qual);
+
+    CellularBand band_avail;
+    if (Cellular.getBandSelect(band_avail)) {
+      Serial.print("Available bands: ");
+      for (int x=0; x<band_avail.count; x++) {
+          Serial.printf("%d", band_avail.band[x]);
+          if (x+1 < band_avail.count) Serial.printf(",");
+        }
+        Serial.println();
+      }
+      else {
+        Serial.printlnf("Bands available not retrieved from the modem!");
+      }
+
+    Serial.print("Offset: ");
+    Serial.println(offset);
+    Serial.print("Scalefactor: ");
+    Serial.println(scalefactor);
+
+    if (scalefactor != 0) {
+      scale_conf = true;
+    }
+
 
     scale.set_scale(scalefactor);                      //this value is obtained by calibrating the scale with known weights;
                                                  /*   How to Calibrate Your Scale
@@ -161,12 +203,19 @@ void loop() {
       stringSOC = String(soc);
       delay(1000);
 
-      Particle.publish("cloud4bees", JSON(), PRIVATE); // Send JSON Particle Cloud
+      if (!scale_conf ){
+        System.sleep(SLEEP_MODE_DEEP, 3600);
+
+      } else {
+
+      //if (floatGewicht < 100000) {
+        Particle.publish("cloud4bees", JSON(), PRIVATE); // Send JSON Particle Cloud
+      //}
 
       delay(1000);
 
       System.sleep(SLEEP_MODE_DEEP, 3600);
-
+    }
 }
 
 
