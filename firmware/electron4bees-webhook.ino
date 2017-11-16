@@ -2,8 +2,12 @@
 #include "application.h" //Notwendig damit die externe RGB-LED schon beim Booten leuchtet!
 #include "HX711.h"
 #include "Particle.h"
-#include "Adafruit_DHT.h"
+#include "PietteTech_DHT.h" //Include PietteTech_DHT
 #include "cellular_hal.h"
+
+//PRODUCT_ID(1518); // replace by your product ID
+//PRODUCT_VERSION(5); // increment each time you upload to the console
+
 
 // Using SEMI_AUTOMATIC mode to get the lowest possible data usage by
 // registering functions and variables BEFORE connecting to the cloud.
@@ -17,7 +21,7 @@
 // Automatically mirror the onboard RGB LED to an external RGB LED
 // No additional code needed in setup() or loop()
 
-class ExternalRGB {
+/*class ExternalRGB {
   public:
     ExternalRGB(pin_t r, pin_t g, pin_t b) : pin_r(r), pin_g(g), pin_b(b) {
       pinMode(pin_r, OUTPUT);
@@ -41,6 +45,13 @@ private:
 
 // Connect an external RGB LED to D0, D1 and D2 (R, G, and B)
 ExternalRGB myRGB(D0, D1, D2);
+//ExternalRGB myRGB(D0, D3, D2);
+*/
+
+
+//Since 0.6.1 Allows a set of PWM pins to mirror the functionality of the on-board RGB LED.
+STARTUP(RGB.mirrorTo(D3, D3, D3));
+
 
 //********************************************************************
 
@@ -54,8 +65,8 @@ ExternalRGB myRGB(D0, D1, D2);
 #define DHTTYPE4 DHT22		// DHT 22 (AM2302)
 //#define DHTTYPE DHT21		// DHT 21 (AM2301)
 
-DHT dht_pin3(DHTPIN3, DHTTYPE3);
-DHT dht_pin4(DHTPIN4, DHTTYPE4);
+PietteTech_DHT dht_pin3(DHTPIN3, DHTTYPE3);
+PietteTech_DHT dht_pin4(DHTPIN4, DHTTYPE4);
 
 //HX711 Wägezellenverstärker
 #define DOUT  A0
@@ -84,13 +95,18 @@ String stringHumidity4 = "";
 float floatTemperature4 = 0;
 String stringTemperature4 ="";
 
+float floatRSSI = 0;
+String stringRSSI = "";
+
 double soc = 0; // Variable to keep track of LiPo state-of-charge (SOC)
 String stringSOC = "";
 
 boolean scale_conf = false;
 
 
+
 void setup() {
+
   // put your setup code here, to run once:
 
   //Needed in SEMI_AUTOMATIC Mode
@@ -115,6 +131,7 @@ void setup() {
 
     // publish the event that will trigger our Webhook
     Particle.publish("get_offset");
+    delay(5000);
     Particle.publish("get_scalefactor");
     delay(5000);
 
@@ -168,8 +185,9 @@ void loop() {
 
 
     //Begin DHT communication
-      dht_pin3.begin();
-      dht_pin4.begin();
+     int result3 = dht_pin3.acquireAndWait(1000); // wait up to 1 sec (default indefinitely)
+     int result4 = dht_pin4.acquireAndWait(1000);
+
 
       delay(5000);
 
@@ -188,14 +206,18 @@ void loop() {
     	floatHumidity3 = dht_pin3.getHumidity();
       stringHumidity3 = String(floatHumidity3, 2),
     // Read temperature as Celsius
-    	floatTemperature3 = dht_pin3.getTempCelcius();
+    	floatTemperature3 = dht_pin3.getCelsius();
       stringTemperature3 = String(floatTemperature3, 2);
 
       floatHumidity4 = dht_pin4.getHumidity();
       stringHumidity4 = String(floatHumidity4, 2),
     // Read temperature as Celsius
-    	floatTemperature4 = dht_pin4.getTempCelcius();
+    	floatTemperature4 = dht_pin4.getCelsius();
       stringTemperature4 = String(floatTemperature4, 2);
+
+      CellularSignal sig = Cellular.RSSI();
+      floatRSSI = sig.rssi;
+      stringRSSI = String(floatRSSI, 2);
 
     // Use the on-board Fuel Gauge
       FuelGauge fuel;
@@ -204,7 +226,7 @@ void loop() {
       delay(1000);
 
       if (!scale_conf ){
-        System.sleep(SLEEP_MODE_DEEP, 3600);
+        System.sleep(SLEEP_MODE_DEEP, 3580);
 
       } else {
 
@@ -214,7 +236,7 @@ void loop() {
 
       delay(1000);
 
-      System.sleep(SLEEP_MODE_DEEP, 3600);
+      System.sleep(SLEEP_MODE_DEEP, 3580);
     }
 }
 
@@ -241,7 +263,7 @@ String JSON() {
   ret.concat("&field4=");
   ret.concat(stringTemperature4);
   ret.concat("&field5=");
-  ret.concat(stringHumidity4);
+  ret.concat(stringRSSI);
   ret.concat("&field6=");
   ret.concat(stringSOC);
 
